@@ -34,4 +34,6 @@ int main() {
     Resultados: Ambos resultaram 100 como soma.
     Importância do reduction: O reduction tem a função de criar cópias da variável soma_paralela em cada thread, assim evitando que várias threads acessem a mesma variável ao mesmo tempo, ocasionando erros na soma.
     */
+
+    return 0;
 }
