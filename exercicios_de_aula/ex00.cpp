@@ -21,6 +21,22 @@ exercício 5     21/10/2025.
 #include <vector>
 #include <cmath>
 #include <omp.h>
+#include <chrono>
+
+// Função para medir o tempo total de execução em milissegundos
+template <typename Func, typename... Args>
+double medir_tempo_total(Func&& func, Args&&... args) {
+    auto inicio = std::chrono::high_resolution_clock::now();
+    
+    // Chamando a função
+    std::forward<Func>(func)(std::forward<Args>(args)...);
+    
+    auto fim = std::chrono::high_resolution_clock::now();
+    
+    // Calculando a duração
+    std::chrono::duration<double> duracao = fim - inicio;
+    return duracao.count() * 1000;
+}
 
 // Função para calcular as raizes de uma equação de segundo grau
 // Retorna um std::pair contendo as raizes x1 e x2.
@@ -202,8 +218,86 @@ int main() {
         for (int i = 0; i < N; ++i) {
             std::cout << "Resultado para a equação " << i << ": Soma das raízes = " << soma_raizes[i] << std::endl;
         }
+        std::cout << std::endl;
     }
 
+    std::cout << "Exercício 05: " << std::endl;
+
+    std::cout << "Com lock: " << std::endl;
+    {
+        const int N = 1000;
+        std::vector<double> a(N, 1.0), b(N, -5.0), c(N, 6.0);
+
+        double soma_pares = 0.0;
+        double soma_impares = 0.0;
+
+        omp_lock_t lock_pares;
+        omp_lock_t lock_impares;
+
+        omp_init_lock(&lock_pares);
+        omp_init_lock(&lock_impares);
+
+        double tempo_inicio = omp_get_wtime();
+
+        #pragma omp parallel for
+        for (int i = 0; i < N; ++i) {
+            std::pair<double, double> raizes = resolver_bhaskara(a[i], b[i], c[i]);
+            double soma_local = raizes.first + raizes.second;
+
+            if (i % 2 == 0) {
+                omp_set_lock(&lock_pares);
+                soma_pares += soma_local;
+                omp_unset_lock(&lock_pares);
+            } else {
+                omp_set_lock(&lock_impares);
+                soma_impares += soma_local;
+                omp_unset_lock(&lock_impares);
+            }
+        }
+
+        double tempo_fim = omp_get_wtime();
+        double lock_time = (tempo_fim - tempo_inicio) * 1000;
+
+        omp_destroy_lock(&lock_pares);
+        omp_destroy_lock(&lock_impares);
+
+        std::cout << "Soma das equações pares: " << soma_pares << std::endl;
+        std::cout << "Soma das equações ímpares: " << soma_impares << std::endl;
+        std::cout << "Soma total (locks): " << soma_pares + soma_impares << std::endl;
+        std::cout << "Tempo de execução com locks: " << lock_time << " ms" << std::endl;
+        std::cout << std::endl;
+    }
+
+    std::cout << "Com reduction: " << std::endl;
+    {
+        const int N = 1000;
+        std::vector<double> a(N, 1.0), b(N, -5.0), c(N, 6.0);
+
+        double soma_pares = 0.0;
+        double soma_impares = 0.0;
+
+        double tempo_inicio = omp_get_wtime();
+
+        #pragma omp parallel for reduction(+:soma_pares, soma_impares)
+        for (int i = 0; i < N; ++i) {
+            std::pair<double, double> raizes = resolver_bhaskara(a[i], b[i], c[i]);
+            double soma_local = raizes.first + raizes.second;
+
+            if (i % 2 == 0) {
+                soma_pares += soma_local;
+            } else {
+                soma_impares += soma_local;
+            }
+        }
+
+        double tempo_fim = omp_get_wtime();
+        double reduction_tempo = (tempo_fim - tempo_inicio) * 1000;
+
+        std::cout << "Soma das equações pares: " << soma_pares << std::endl;
+        std::cout << "Soma das equações ímpares: " << soma_impares << std::endl;
+        std::cout << "Soma total (sem locks): " << soma_pares + soma_impares << std::endl;
+        std::cout << "Tempo de execução com reduction: " << reduction_tempo << " ms" << std::endl;
+    }
     // ===============================================================
 
     return 0;
