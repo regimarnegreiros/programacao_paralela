@@ -2,3 +2,4 @@ main
 ex[0-9][0-9]
 .vscode
 openmp
+openmpi
